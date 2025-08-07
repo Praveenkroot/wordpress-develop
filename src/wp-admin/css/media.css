@@ -1448,3 +1448,7 @@ audio, video {
 		margin-top: 10px;
 	}
 }
+
+.media-lasso-box {
+    pointer-events: none;
+}
