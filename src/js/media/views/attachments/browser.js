@@ -109,7 +109,87 @@ AttachmentsBrowser = View.extend(/** @lends wp.media.view.AttachmentsBrowser.pro
 
 		// The non-cached or cached attachments query has completed.
 		this.collection.on( 'attachments:received', this.announceSearchResults, this );
+		
+		// Drag select option for bulk select mode
+		this.$el.on('mousedown', this.startLassoSelect.bind(this));
 	},
+
+	startLassoSelect: function (event) {
+		if (!event.target.closest('.attachments')) return;
+	
+		if (!this.controller.isModeActive('select')) return;
+	
+		this.lassoStartX = event.pageX;
+		this.lassoStartY = event.pageY;
+	
+		this.$lasso = $('<div class="media-lasso-box"></div>').appendTo('body').css({
+			position: 'absolute',
+			border: '1px dashed #0073aa',
+			background: 'rgba(0, 115, 170, 0.2)',
+			left: this.lassoStartX + 'px',
+			top: this.lassoStartY + 'px',
+			width: '0',
+			height: '0',
+			zIndex: 9999
+		});
+	
+		$(window).on('mousemove.wpLasso', this.updateLassoSelect.bind(this));
+		$(window).on('mouseup.wpLasso', this.endLassoSelect.bind(this));
+	},
+	
+	updateLassoSelect: function (event) {
+		if (!this.controller.isModeActive('select')) return;
+	
+		const x1 = Math.min(this.lassoStartX, event.pageX);
+		const y1 = Math.min(this.lassoStartY, event.pageY);
+		const x2 = Math.max(this.lassoStartX, event.pageX);
+		const y2 = Math.max(this.lassoStartY, event.pageY);
+	
+		this.$lasso.css({
+			left: x1 + 'px',
+			top: y1 + 'px',
+			width: (x2 - x1) + 'px',
+			height: (y2 - y1) + 'px',
+		});
+	
+		const attachments = this.controller.state().get('library');
+		const selection = this.controller.state().get('selection');
+	
+		this.$('.attachment').each((i, el) => {
+			const $el = $(el);
+			const rect = el.getBoundingClientRect();
+			const overlap = !(
+				rect.right < x1 ||
+				rect.left > x2 ||
+				rect.bottom < y1 ||
+				rect.top > y2
+			);
+	
+			const id = $el.data('id');
+			const model = attachments.get(id);
+	
+			if (model) {
+				if (overlap) {
+					selection.add(model);
+					$el.addClass('selected'); 
+				} else {
+					selection.remove(model);
+					$el.removeClass('selected'); 
+				}
+			}
+		});
+	
+		selection.trigger('selection:toggle');
+		this.controller.trigger('selection:toggle');
+	},
+	
+	endLassoSelect: function () {
+		if (this.$lasso) {
+			this.$lasso.remove();
+			this.$lasso = null;
+		}
+		$(window).off('.wpLasso');
+	},	
 
 	/**
 	 * Updates the `wp.a11y.speak()` ARIA live region with a message to communicate
